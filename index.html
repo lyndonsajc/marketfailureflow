@@ -1,0 +1,715 @@
+import React, { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
+
+function MarketFailureDiagram({ type }) {
+  const isOver = type.includes("over");
+  const isBenefitSide = type.includes("Benefit") || type.includes("benefit");
+  const isInfo = type.includes("Info");
+
+  const axisY = 310;
+  const x1 = 95;
+  const x2 = 430;
+
+  const lineY = (leftY, rightY) => {
+    const m = (rightY - leftY) / (x2 - x1);
+    const fn = (x) => leftY + m * (x - x1);
+    fn.m = m;
+    fn.b = leftY - m * x1;
+    return fn;
+  };
+
+  const intersectX = (lineA, lineB) => (lineB.b - lineA.b) / (lineA.m - lineB.m);
+
+  const mpcY = lineY(270, 90);
+  const highCostY = lineY(220, 40);
+  const lowCostY = lineY(320, 140);
+  const mpbY = lineY(70, 270);
+  const highBenefitY = lineY(20, 220);
+  const lowBenefitY = lineY(120, 320);
+
+  let qP;
+  let qS;
+  let privateCostY;
+  let socialCostY;
+  let privateBenefitY;
+  let socialBenefitY;
+  let costLabels;
+  let benefitLabels;
+
+  if (!isBenefitSide) {
+    privateBenefitY = mpbY;
+    socialBenefitY = mpbY;
+
+    if (isInfo) {
+      privateCostY = isOver ? lowCostY : highCostY;
+      socialCostY = mpcY;
+      costLabels = isOver
+        ? { private: "Perceived MPC", social: "Actual MPC" }
+        : { private: "Perceived MPC", social: "Actual MPC" };
+    } else {
+      privateCostY = mpcY;
+      socialCostY = highCostY;
+      costLabels = { private: "MPC", social: "MSC" };
+    }
+
+    qP = intersectX(privateCostY, privateBenefitY);
+    qS = intersectX(socialCostY, socialBenefitY);
+    benefitLabels = { private: "MPB = MSB", social: "MPB = MSB" };
+  } else {
+    privateCostY = mpcY;
+    socialCostY = mpcY;
+
+    if (isInfo) {
+      privateBenefitY = isOver ? highBenefitY : lowBenefitY;
+      socialBenefitY = mpbY;
+      benefitLabels = isOver
+        ? { private: "Perceived MPB", social: "Actual MPB" }
+        : { private: "Perceived MPB", social: "Actual MPB" };
+    } else {
+      privateBenefitY = mpbY;
+      socialBenefitY = highBenefitY;
+      benefitLabels = { private: "MPB", social: "MSB" };
+    }
+
+    qP = intersectX(privateCostY, privateBenefitY);
+    qS = intersectX(socialCostY, socialBenefitY);
+    costLabels = { private: "MPC = MSC", social: "MPC = MSC" };
+  }
+
+  const qP_Y = privateCostY(qP);
+  const qS_Y = socialCostY(qS);
+
+  let dwlPoints;
+
+  if (isOver) {
+    // Overconsumption / overproduction: welfare loss is from QS to QP.
+    // At QP, social cost is above social benefit.
+    dwlPoints = `${qS},${socialCostY(qS)} ${qP},${socialCostY(qP)} ${qP},${socialBenefitY(qP)}`;
+  } else {
+    // Underconsumption / underproduction: welfare loss is from QP to QS.
+    // At QP, social benefit is above social cost.
+    dwlPoints = `${qP},${socialBenefitY(qP)} ${qP},${socialCostY(qP)} ${qS},${socialCostY(qS)}`;
+  }
+
+  const title = isBenefitSide ? "Benefit-side diagram" : "Cost-side diagram";
+  const qText = isOver ? "QP > QS: too much is consumed/produced." : "QP < QS: too little is consumed/produced.";
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">DWL</span>
+      </div>
+
+      <svg viewBox="0 0 520 370" className="h-auto w-full">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 z" fill="#334155" />
+          </marker>
+        </defs>
+
+        <line x1="70" y1={axisY} x2="470" y2={axisY} stroke="#334155" strokeWidth="2" markerEnd="url(#arrow)" />
+        <line x1="70" y1={axisY} x2="70" y2="45" stroke="#334155" strokeWidth="2" markerEnd="url(#arrow)" />
+        <text x="474" y="315" className="fill-slate-700 text-xs font-semibold">Quantity</text>
+        <text x="28" y="42" className="fill-slate-700 text-xs font-semibold">Cost / Benefit</text>
+
+        <line x1={x1} y1={privateCostY(x1)} x2={x2} y2={privateCostY(x2)} stroke="#2563eb" strokeWidth="3" />
+        {socialCostY !== privateCostY && (
+          <line x1={x1} y1={socialCostY(x1)} x2={x2} y2={socialCostY(x2)} stroke="#dc2626" strokeWidth="3" />
+        )}
+        <line x1={x1} y1={privateBenefitY(x1)} x2={x2} y2={privateBenefitY(x2)} stroke="#16a34a" strokeWidth="3" />
+        {socialBenefitY !== privateBenefitY && (
+          <line x1={x1} y1={socialBenefitY(x1)} x2={x2} y2={socialBenefitY(x2)} stroke="#059669" strokeWidth="3" strokeDasharray="8,5" />
+        )}
+
+        <text x="382" y={privateCostY(390) - 8} className="fill-blue-700 text-sm font-bold">{costLabels.private}</text>
+        {socialCostY !== privateCostY && (
+          <text x="382" y={socialCostY(390) - 8} className="fill-red-700 text-sm font-bold">{costLabels.social}</text>
+        )}
+        <text x="372" y={privateBenefitY(390) + 20} className="fill-green-700 text-sm font-bold">{benefitLabels.private}</text>
+        {socialBenefitY !== privateBenefitY && (
+          <text x="372" y={socialBenefitY(390) + 20} className="fill-emerald-700 text-sm font-bold">{benefitLabels.social}</text>
+        )}
+
+        <polygon
+          points={dwlPoints}
+          fill="#ef4444"
+          opacity="0.35"
+          stroke="#dc2626"
+          strokeWidth="2.5"
+        />
+        <text
+          x={isOver ? (qP - 55) : (qP + 15)}
+          y={isOver ? ((socialCostY(qP) + socialBenefitY(qP)) / 2) : ((socialBenefitY(qP) + socialCostY(qP)) / 2)}
+          className="fill-red-700 text-sm font-black"
+        >
+          DWL
+        </text>
+
+        <line x1={qS} y1={axisY} x2={qS} y2={qS_Y} stroke="#64748b" strokeDasharray="5,5" opacity="0.8" />
+        <line x1={qP} y1={axisY} x2={qP} y2={qP_Y} stroke="#64748b" strokeDasharray="5,5" opacity="0.8" />
+
+        <circle cx={qP} cy={qP_Y} r="5" fill="#111827" />
+        <circle cx={qS} cy={qS_Y} r="5" fill="#111827" />
+
+        <text x={qP + 8} y={qP_Y - 8} className="fill-slate-900 text-xs font-black">QP: MPB = MPC</text>
+        <text x={qS + 8} y={qS_Y - 8} className="fill-slate-900 text-xs font-black">QS: MSB = MSC</text>
+
+        <text x={qS - 15} y="333" className="fill-slate-800 text-sm font-bold">QS</text>
+        <text x={qP - 15} y="333" className="fill-slate-800 text-sm font-bold">QP</text>
+
+        <text x="160" y="358" className="fill-red-700 text-xs font-bold">
+          DWL is the welfare loss between MSB and MSC from QP to QS
+        </text>
+      </svg>
+
+      <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+        <b>Key idea:</b> QP is where private decision-makers equate MPB and MPC. QS is where society equates MSB and MSC. {qText}
+      </div>
+    </div>
+  );
+}
+
+function NegativeConsumptionDiagram() {
+  const qS = 220;
+  const qP = 360;
+  const yA = 252;
+  const yB = 205;
+  const yC = 134;
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-slate-800">Negative externality in consumption</h3>
+        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">DWL = ABC</span>
+      </div>
+      <svg viewBox="0 0 520 360" className="h-auto w-full">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L6,3 z" fill="#334155" />
+          </marker>
+        </defs>
+
+        <line x1="70" y1="310" x2="470" y2="310" stroke="#334155" strokeWidth="2" markerEnd="url(#arrow)" />
+        <line x1="70" y1="310" x2="70" y2="45" stroke="#334155" strokeWidth="2" markerEnd="url(#arrow)" />
+        <text x="475" y="315" className="fill-slate-700 text-xs font-semibold">Quantity</text>
+        <text x="35" y="40" className="fill-slate-700 text-xs font-semibold">Cost / Benefit</text>
+
+        <line x1="95" y1="285" x2="430" y2="95" stroke="#2563eb" strokeWidth="3" />
+        <text x="405" y="88" className="fill-blue-700 text-sm font-bold">MPC</text>
+
+        <line x1="95" y1="220" x2="430" y2="45" stroke="#dc2626" strokeWidth="3" />
+        <text x="405" y="47" className="fill-red-700 text-sm font-bold">MSC</text>
+
+        <line x1="95" y1="80" x2="430" y2="275" stroke="#16a34a" strokeWidth="3" />
+        <text x="388" y="287" className="fill-green-700 text-sm font-bold">MPB = MSB</text>
+
+        <polygon points={`${qS},${yB} ${qP},${yA} ${qP},${yC}`} fill="#ef4444" opacity="0.25" stroke="#dc2626" strokeWidth="2" />
+
+        <line x1={qS} y1="310" x2={qS} y2={yB} stroke="#64748b" strokeDasharray="5,5" />
+        <line x1={qP} y1="310" x2={qP} y2={yA} stroke="#64748b" strokeDasharray="5,5" />
+
+        <circle cx={qS} cy={yB} r="5" fill="#111827" />
+        <circle cx={qP} cy={yA} r="5" fill="#111827" />
+        <circle cx={qP} cy={yC} r="5" fill="#111827" />
+
+        <text x={qS - 15} y={yB - 10} className="fill-slate-900 text-sm font-black">B</text>
+        <text x={qP + 8} y={yA + 3} className="fill-slate-900 text-sm font-black">A</text>
+        <text x={qP + 8} y={yC + 3} className="fill-slate-900 text-sm font-black">C</text>
+
+        <text x={qS - 15} y="333" className="fill-slate-800 text-sm font-bold">Q<tspan baselineShift="sub">S</tspan></text>
+        <text x={qP - 15} y="333" className="fill-slate-800 text-sm font-bold">Q<tspan baselineShift="sub">P</tspan></text>
+
+        <path d={`M${qS},335 C260,350 320,350 ${qP},335`} fill="none" stroke="#f97316" strokeWidth="2" />
+        <text x="260" y="355" className="fill-orange-700 text-xs font-bold">overconsumed by QSQP</text>
+      </svg>
+      <div className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+        <div className="rounded-2xl bg-slate-50 p-3"><b>Free market:</b> MPB = MPC at QP.</div>
+        <div className="rounded-2xl bg-slate-50 p-3"><b>Social optimum:</b> MSB = MSC at QS.</div>
+        <div className="rounded-2xl bg-red-50 p-3 md:col-span-2"><b>Problem:</b> QP &gt; QS, so car journeys are overconsumed. Social cost is greater than social benefit for QSQP, causing DWL ABC.</div>
+      </div>
+    </div>
+  );
+}
+
+const flow = {
+  start: {
+    title: "Market Failure Flow Chart",
+    question: "What type of market failure is shown?",
+    hint: "Start by identifying whether the issue is caused by external effects on third parties, or imperfect information.",
+    options: [
+      { label: "Externality", next: "externalitySide" },
+      { label: "Information gap", next: "infoGapSide" },
+    ],
+  },
+  externalitySide: {
+    title: "Step 1: Identify the side affected",
+    question: "Is the externality on the cost side or benefit side?",
+    hint: "Cost side means MSC differs from MPC. Benefit side means MSB differs from MPB.",
+    options: [
+      { label: "Cost side", next: "externalCostType" },
+      { label: "Benefit side", next: "externalBenefitType" },
+    ],
+  },
+  externalCostType: {
+    title: "Step 2: External cost or external benefit?",
+    question: "Does production or consumption create extra costs for third parties?",
+    hint: "Ask yourself: is the consumption or production activity causing external costs to third parties? If consumers create the external cost, it is consumption. If firms create the external cost during production, it is production.",
+    options: [
+      { label: "External cost in production", next: "overproductionExternalCost" },
+      { label: "External cost in consumption", next: "overconsumptionExternalCost" },
+    ],
+  },
+  externalBenefitType: {
+    title: "Step 2: External benefit",
+    question: "Does production or consumption create extra benefits for third parties?",
+    hint: "Ask yourself: is the consumption or production activity creating external benefits for third parties? If consumers create the external benefit, it is consumption. If firms create the external benefit during production, it is production.",
+    options: [
+      { label: "External benefit in production", next: "underproductionExternalBenefit" },
+      { label: "External benefit in consumption", next: "underconsumptionExternalBenefit" },
+    ],
+  },
+  infoGapSide: {
+    title: "Step 1: Identify the side affected",
+    question: "Is the information gap on the cost side or benefit side?",
+    hint: "Cost-side information gap affects perceived cost. Benefit-side information gap affects perceived benefit.",
+    options: [
+      { label: "Cost side", next: "infoCostDirection" },
+      { label: "Benefit side", next: "infoBenefitDirection" },
+    ],
+  },
+  infoCostDirection: {
+    title: "Step 2: Cost-side information gap",
+    question: "Are decision-makers underestimating or overestimating the true cost?",
+    hint: "If perceived cost is too low, people do too much. If perceived cost is too high, people do too little.",
+    options: [
+      { label: "Underestimate true cost", next: "overOutcomeInfoCost" },
+      { label: "Overestimate true cost", next: "underOutcomeInfoCost" },
+    ],
+  },
+  infoBenefitDirection: {
+    title: "Step 2: Benefit-side information gap",
+    question: "Are decision-makers underestimating or overestimating the true benefit?",
+    hint: "If perceived benefit is too low, people do too little. If perceived benefit is too high, people do too much.",
+    options: [
+      { label: "Underestimate true benefit", next: "underOutcomeInfoBenefit" },
+      { label: "Overestimate true benefit", next: "overOutcomeInfoBenefit" },
+    ],
+  },
+  overOutcomeInfoCost: {
+    title: "Final step",
+    question: "This is linked to consumers underestimating true cost.",
+    hint: "Information gaps are usually analysed from the consumer side in H1/H2 market failure questions.",
+    options: [
+      { label: "Continue to overconsumption", next: "overconsumptionInfoCost" },
+    ],
+  },
+  underOutcomeInfoCost: {
+    title: "Final step",
+    question: "This is linked to consumers overestimating true cost.",
+    hint: "Information gaps are usually analysed from the consumer side in H1/H2 market failure questions.",
+    options: [
+      { label: "Continue to underconsumption", next: "underconsumptionInfoCost" },
+    ],
+  },
+  underOutcomeInfoBenefit: {
+    title: "Final step",
+    question: "This is linked to consumers underestimating true benefit.",
+    hint: "Information gaps are usually analysed from the consumer side in H1/H2 market failure questions.",
+    options: [
+      { label: "Continue to underconsumption", next: "underconsumptionInfoBenefit" },
+    ],
+  },
+  overOutcomeInfoBenefit: {
+    title: "Final step",
+    question: "This is linked to consumers overestimating true benefit.",
+    hint: "Information gaps are usually analysed from the consumer side in H1/H2 market failure questions.",
+    options: [
+      { label: "Continue to overconsumption", next: "overconsumptionInfoBenefit" },
+    ],
+  },
+};
+
+function buildSevenSteps({ type, context, decisionMaker, privateCost, privateBenefit, externalEffect, divergence, assumption, marketRule, socialRule, outcome, welfare }) {
+  return [
+    `${type} occurs when ${externalEffect}.`,
+    `In the case of ${context}, ${decisionMaker} incur private costs such as ${privateCost}, while enjoying private benefits such as ${privateBenefit}.`,
+    `This creates a market failure because the decision made by ${decisionMaker} does not fully reflect the true cost or benefit to society.`,
+    `${divergence}`,
+    `${assumption}`,
+    `The free-market equilibrium occurs at QP where ${marketRule}. The socially optimal equilibrium occurs at QS where ${socialRule}.`,
+    `${outcome} ${welfare}`,
+  ];
+}
+
+const explanations = {
+  overproductionExternalCost: buildSevenSteps({
+    type: "Negative externalities in production",
+    context: "factory production",
+    decisionMaker: "producers",
+    privateCost: "labour, raw materials and machinery costs",
+    privateBenefit: "revenue and profits from selling the good",
+    externalEffect: "external costs are imposed on third parties from the production of a good or service by firms",
+    divergence: "The presence of marginal external cost (MEC > 0) causes MSC to be higher than MPC.",
+    assumption: "Assuming no external benefits, MPB = MSB.",
+    marketRule: "MPB = MPC",
+    socialRule: "MSB = MSC",
+    outcome: "Since QP > QS, there is overproduction.",
+    welfare: "The units from QS to QP create social costs greater than social benefits, causing deadweight loss. To achieve allocative efficiency, production should fall to QS.",
+  }),
+  overconsumptionExternalCost: buildSevenSteps({
+    type: "Negative externalities in consumption",
+    context: "car journeys",
+    decisionMaker: "drivers",
+    privateCost: "fuel costs",
+    privateBenefit: "convenience and time saved",
+    externalEffect: "external costs are imposed on third parties from the consumption of a good or service by private individuals",
+    divergence: "The presence of marginal external cost (MEC > 0) causes MSC to be higher than MPC.",
+    assumption: "Assuming no external benefits, MPB = MSB.",
+    marketRule: "MPB = MPC",
+    socialRule: "MSB = MSC",
+    outcome: "Since QP > QS, there is overconsumption.",
+    welfare: "The overconsumed units from QS to QP create social costs greater than social benefits, causing deadweight loss ABC. Society's welfare increases if consumption falls to QS.",
+  }),
+  underproductionExternalBenefit: buildSevenSteps({
+    type: "Positive externalities in production",
+    context: "firms providing worker training",
+    decisionMaker: "producers",
+    privateCost: "training costs and time spent organising training",
+    privateBenefit: "higher productivity and better-quality output",
+    externalEffect: "external benefits are enjoyed by third parties from the production of a good or service by firms",
+    divergence: "The presence of marginal external benefit (MEB > 0) causes MSB to be higher than MPB.",
+    assumption: "Assuming no external costs, MPC = MSC.",
+    marketRule: "MPB = MPC",
+    socialRule: "MSB = MSC",
+    outcome: "Since QP < QS, there is underproduction.",
+    welfare: "The units from QP to QS create social benefits greater than social costs, so society loses potential welfare when these units are not produced.",
+  }),
+  underconsumptionExternalBenefit: buildSevenSteps({
+    type: "Positive externalities in consumption",
+    context: "vaccination or education",
+    decisionMaker: "consumers",
+    privateCost: "fees, time and effort",
+    privateBenefit: "better health, knowledge or future opportunities",
+    externalEffect: "external benefits are enjoyed by third parties from the consumption of a good or service by private individuals",
+    divergence: "The presence of marginal external benefit (MEB > 0) causes MSB to be higher than MPB.",
+    assumption: "Assuming no external costs, MPC = MSC.",
+    marketRule: "MPB = MPC",
+    socialRule: "MSB = MSC",
+    outcome: "Since QP < QS, there is underconsumption.",
+    welfare: "The units from QP to QS create social benefits greater than social costs, so society loses potential welfare when these units are not consumed.",
+  }),
+  overconsumptionInfoCost: buildSevenSteps({
+    type: "Information failure on the cost side",
+    context: "consumers buying a harmful good",
+    decisionMaker: "consumers",
+    privateCost: "the price paid and immediate inconvenience",
+    privateBenefit: "satisfaction or enjoyment from consuming the good",
+    externalEffect: "consumers underestimate the true private cost of consuming the good",
+    divergence: "Because perceived cost is lower than the true cost, the perceived MPC is lower than the actual MPC.",
+    assumption: "Assuming benefits are accurately perceived, perceived MPB = actual MPB.",
+    marketRule: "perceived MPB = perceived MPC",
+    socialRule: "actual MPB = actual MPC",
+    outcome: "Since QP > QS, there is overconsumption.",
+    welfare: "The extra units consumed create actual costs greater than actual benefits, causing deadweight loss. Consumption should fall to QS.",
+  }),
+  underconsumptionInfoCost: buildSevenSteps({
+    type: "Information failure on the cost side",
+    context: "consumers overestimating the cost or risk of a beneficial good",
+    decisionMaker: "consumers",
+    privateCost: "price, time and perceived risk",
+    privateBenefit: "benefits gained from consuming the good",
+    externalEffect: "consumers overestimate the true private cost of consuming the good",
+    divergence: "Because perceived cost is higher than the true cost, the perceived MPC is higher than the actual MPC.",
+    assumption: "Assuming benefits are accurately perceived, perceived MPB = actual MPB.",
+    marketRule: "perceived MPB = perceived MPC",
+    socialRule: "actual MPB = actual MPC",
+    outcome: "Since QP < QS, there is underconsumption.",
+    welfare: "The units from QP to QS would create actual benefits greater than actual costs. Society loses potential welfare when these units are not consumed.",
+  }),
+  underconsumptionInfoBenefit: buildSevenSteps({
+    type: "Information failure on the benefit side",
+    context: "consumers underestimating the benefit of education or preventive healthcare",
+    decisionMaker: "consumers",
+    privateCost: "fees, time and effort",
+    privateBenefit: "future income, health or personal improvement",
+    externalEffect: "consumers underestimate the true private benefit of consuming the good",
+    divergence: "Because perceived benefit is lower than the true benefit, the perceived MPB is lower than the actual MPB.",
+    assumption: "Assuming costs are accurately perceived, perceived MPC = actual MPC.",
+    marketRule: "perceived MPB = perceived MPC",
+    socialRule: "actual MPB = actual MPC",
+    outcome: "Since QP < QS, there is underconsumption.",
+    welfare: "The units from QP to QS would create actual benefits greater than actual costs. Society loses potential welfare when these units are not consumed.",
+  }),
+  overconsumptionInfoBenefit: buildSevenSteps({
+    type: "Information failure on the benefit side",
+    context: "consumers misled by exaggerated advertising",
+    decisionMaker: "consumers",
+    privateCost: "the price paid and time spent consuming the good",
+    privateBenefit: "the perceived usefulness or satisfaction from consuming the good",
+    externalEffect: "consumers overestimate the true private benefit of consuming the good",
+    divergence: "Because perceived benefit is higher than the true benefit, the perceived MPB is higher than the actual MPB.",
+    assumption: "Assuming costs are accurately perceived, perceived MPC = actual MPC.",
+    marketRule: "perceived MPB = perceived MPC",
+    socialRule: "actual MPB = actual MPC",
+    outcome: "Since QP > QS, there is overconsumption.",
+    welfare: "The extra units consumed create actual costs greater than actual benefits, causing deadweight loss. Consumption should fall to QS.",
+  }),
+};
+
+const outcomes = {
+  overproductionExternalCost: {
+    result: "Overproduction",
+    tag: "Negative externality in production",
+    explanation: "Producers ignore external costs. MPC is lower than MSC, so the free market produces more than the socially optimal quantity.",
+    example: "Example: factory pollution.",
+  },
+  overconsumptionExternalCost: {
+    result: "Overconsumption",
+    tag: "Negative externality in consumption",
+    explanation: "Consumption creates external costs for third parties. Using car journeys as an example, drivers enjoy private benefits such as convenience and time saved, and incur private costs such as fuel costs. However, driving also imposes external costs on others through traffic congestion and loss of productivity. Since MEC > 0, MSC is higher than MPC. Assuming no external benefit, MPB = MSB. The free market consumes at QP where MPB = MPC, but the socially optimal quantity is QS where MSB = MSC. Since QP > QS, there is overconsumption and deadweight loss.",
+    example: "Example: car journeys causing traffic congestion.",
+    diagram: "negativeConsumption",
+  },
+  underproductionExternalBenefit: {
+    result: "Underproduction",
+    tag: "Positive externality in production",
+    explanation: "Producers do not receive the full social benefit. MSB is higher than MPB, so the free market produces less than the socially optimal quantity.",
+    example: "Example: firms training workers who later benefit other firms.",
+  },
+  underconsumptionExternalBenefit: {
+    result: "Underconsumption",
+    tag: "Positive externality in consumption",
+    explanation: "Consumers do not consider the external benefits to others. MSB is higher than MPB, so the free market consumes less than the socially optimal quantity.",
+    example: "Example: vaccination, education.",
+  },
+  overconsumptionInfoCost: {
+    result: "Overconsumption",
+    tag: "Information gap: cost underestimated by consumers",
+    explanation: "Consumers perceive the private cost to be lower than the true cost, so they consume too much.",
+    example: "Example: consumers underestimate long-term health risks.",
+  },
+  underconsumptionInfoCost: {
+    result: "Underconsumption",
+    tag: "Information gap: cost overestimated by consumers",
+    explanation: "Consumers perceive the private cost to be higher than the true cost, so they consume too little.",
+    example: "Example: consumers overestimate the risk or cost of a beneficial service.",
+  },
+  underconsumptionInfoBenefit: {
+    result: "Underconsumption",
+    tag: "Information gap: benefit underestimated by consumers",
+    explanation: "Consumers perceive the private benefit to be lower than the true benefit, so they consume too little.",
+    example: "Example: students underestimate the benefits of preventive healthcare or education.",
+  },
+  overconsumptionInfoBenefit: {
+    result: "Overconsumption",
+    tag: "Information gap: benefit overestimated by consumers",
+    explanation: "Consumers perceive the private benefit to be higher than the true benefit, so they consume too much.",
+    example: "Example: misleading advertising exaggerates product benefits.",
+  },
+};
+
+const resultColours = {
+  Overconsumption: "bg-orange-100 text-orange-800 border-orange-200",
+  Overproduction: "bg-red-100 text-red-800 border-red-200",
+  Underconsumption: "bg-blue-100 text-blue-800 border-blue-200",
+  Underproduction: "bg-purple-100 text-purple-800 border-purple-200",
+};
+
+export default function MarketFailureFlowChart() {
+  const [current, setCurrent] = useState("start");
+  const [history, setHistory] = useState([]);
+  const [showHint, setShowHint] = useState(false);
+
+  const node = flow[current];
+  const outcome = outcomes[current];
+
+  const progress = useMemo(() => {
+    const total = 4;
+    return Math.min(100, ((history.length + (outcome ? 1 : 0)) / total) * 100);
+  }, [history.length, outcome]);
+
+  function choose(option) {
+    setHistory((prev) => [...prev, { question: node.question, answer: option.label }]);
+    setCurrent(option.next);
+    setShowHint(false);
+  }
+
+  function reset() {
+    setCurrent("start");
+    setHistory([]);
+    setShowHint(false);
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4 text-slate-900">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <div className="flex flex-col gap-3 rounded-3xl bg-white/80 p-5 shadow-lg backdrop-blur md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">H1 / H2 Economics</p>
+            <h1 className="text-2xl font-bold md:text-3xl">Market Failure Decision Flow</h1>
+            <p className="mt-1 text-sm text-slate-600">Choose an option. The next question opens based on your answer.</p>
+          </div>
+          <Button onClick={reset} variant="outline" className="rounded-2xl">
+            <RotateCcw className="mr-2 h-4 w-4" /> Reset
+          </Button>
+        </div>
+
+        <Card className="rounded-3xl border-0 shadow-lg">
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center justify-between text-sm font-medium text-slate-600">
+              <span>Progress</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+              <motion.div
+                className="h-full rounded-full bg-indigo-500"
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.35 }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+          <Card className="min-h-[420px] rounded-3xl border-0 shadow-xl">
+            <CardContent className="p-6">
+              <AnimatePresence mode="wait">
+                {!outcome ? (
+                  <motion.div
+                    key={current}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -16 }}
+                    transition={{ duration: 0.25 }}
+                    className="space-y-6"
+                  >
+                    <div className="inline-flex items-center rounded-full bg-indigo-100 px-4 py-2 text-sm font-semibold text-indigo-700">
+                      <HelpCircle className="mr-2 h-4 w-4" /> {node.title}
+                    </div>
+
+                    <div>
+                      <h2 className="text-2xl font-bold leading-tight md:text-3xl">{node.question}</h2>
+                      <p className="mt-3 text-slate-600">Pick the best answer to continue the flow chart.</p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {node.options.map((option) => (
+                        <motion.button
+                          key={option.label}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => choose(option)}
+                          className="rounded-3xl border border-indigo-100 bg-white p-5 text-left shadow-md transition hover:border-indigo-300 hover:bg-indigo-50"
+                        >
+                          <span className="block text-lg font-bold text-slate-900">{option.label}</span>
+                          <span className="mt-2 block text-sm text-slate-500">Click to open next options</span>
+                        </motion.button>
+                      ))}
+                    </div>
+
+                    <div className="rounded-3xl bg-slate-50 p-4">
+                      <button
+                        onClick={() => setShowHint((prev) => !prev)}
+                        className="text-sm font-semibold text-indigo-700"
+                      >
+                        {showHint ? "Hide hint" : "Need a hint?"}
+                      </button>
+                      {showHint && <p className="mt-2 text-sm text-slate-600">{node.hint}</p>}
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={current}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.25 }}
+                    className="space-y-5"
+                  >
+                    <div className="inline-flex items-center rounded-full bg-green-100 px-4 py-2 text-sm font-semibold text-green-700">
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> Flow completed
+                    </div>
+
+                    <div className={`inline-block rounded-3xl border px-5 py-3 text-2xl font-black ${resultColours[outcome.result]}`}>
+                      {outcome.result}
+                    </div>
+
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">{outcome.tag}</h2>
+                      <p className="mt-3 text-lg leading-relaxed text-slate-700">{outcome.explanation}</p>
+                      <p className="mt-3 rounded-2xl bg-slate-50 p-4 text-slate-600">{outcome.example}</p>
+
+                      <div className="mt-6">
+                        <MarketFailureDiagram type={current} />
+                      </div>
+
+                      <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="mb-4 text-xl font-black text-slate-900">7-Step Economic Explanation</h3>
+
+                        <div className="space-y-4">
+                          {(explanations[current] || []).map((step, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                            >
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-black text-white">
+                                {index + 1}
+                              </div>
+                              <p className="flex-1 text-sm leading-relaxed text-slate-700 md:text-base">
+                                {step}
+                              </p>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button onClick={reset} className="rounded-2xl bg-indigo-600 hover:bg-indigo-700">
+                      Try another pathway
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border-0 shadow-xl">
+            <CardContent className="p-5">
+              <h3 className="mb-4 text-lg font-bold">Your pathway</h3>
+              {history.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">Your choices will appear here.</p>
+              ) : (
+                <div className="space-y-3">
+                  {history.map((item, index) => (
+                    <motion.div
+                      key={`${item.answer}-${index}`}
+                      initial={{ opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Step {index + 1}</p>
+                      <p className="mt-1 text-sm text-slate-600">{item.question}</p>
+                      <p className="mt-2 font-bold text-indigo-700">→ {item.answer}</p>
+                    </motion.div>
+                  ))}
+                  {outcome && (
+                    <div className={`rounded-2xl border p-4 font-bold ${resultColours[outcome.result]}`}>
+                      Final answer: {outcome.result}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
