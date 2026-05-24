@@ -9,75 +9,80 @@ function MarketFailureDiagram({ type }) {
   const isBenefitSide = type.includes("Benefit") || type.includes("benefit");
   const isInfo = type.includes("Info");
 
-  const x1 = 95;
-  const x2 = 430;
   const axisY = 310;
+  const xLeft = 90;
+  const xRight = 430;
 
-  const makeLine = (y1, y2) => {
-    const m = (y2 - y1) / (x2 - x1);
-    const b = y1 - m * x1;
-    return { y: (x) => m * x + b, m, b };
+  const createLine = (xA, yA, xB, yB) => {
+    const m = (yB - yA) / (xB - xA);
+    const c = yA - m * xA;
+    return {
+      y: (x) => m * x + c,
+      m,
+      c,
+    };
   };
 
-  const intersectX = (a, b) => (b.b - a.b) / (a.m - b.m);
+  const intersectionX = (a, b) => (b.c - a.c) / (a.m - b.m);
 
-  const mpc = makeLine(270, 90);
-  const msc = makeLine(220, 40);
-  const lowCost = makeLine(320, 140);
-  const mpb = makeLine(70, 270);
-  const msb = makeLine(20, 220);
-  const lowBenefit = makeLine(120, 320);
-  const highBenefit = makeLine(20, 220);
+  const baseCost = createLine(xLeft, 270, xRight, 90);
+  const higherCost = createLine(xLeft, 220, xRight, 40);
+  const lowerCost = createLine(xLeft, 320, xRight, 140);
 
-  let privateCost = mpc;
-  let socialCost = mpc;
-  let privateBenefit = mpb;
-  let socialBenefit = mpb;
+  const baseBenefit = createLine(xLeft, 70, xRight, 270);
+  const higherBenefit = createLine(xLeft, 20, xRight, 220);
+  const lowerBenefit = createLine(xLeft, 120, xRight, 320);
+
+  let privateCost = baseCost;
+  let socialCost = baseCost;
+  let privateBenefit = baseBenefit;
+  let socialBenefit = baseBenefit;
+
   let privateCostLabel = "MPC";
   let socialCostLabel = "MSC";
   let privateBenefitLabel = "MPB";
   let socialBenefitLabel = "MSB";
 
-  if (!isBenefitSide) {
-    privateBenefit = mpb;
-    socialBenefit = mpb;
-    privateBenefitLabel = "MPB = MSB";
-    socialBenefitLabel = "MPB = MSB";
-
-    if (isInfo) {
-      privateCost = isOver ? lowCost : msc;
-      socialCost = mpc;
-      privateCostLabel = "Perceived MPC";
-      socialCostLabel = "Actual MPC";
-    } else {
-      privateCost = mpc;
-      socialCost = msc;
-      privateCostLabel = "MPC";
-      socialCostLabel = "MSC";
-    }
-  } else {
-    privateCost = mpc;
-    socialCost = mpc;
+  if (isBenefitSide) {
+    privateCost = baseCost;
+    socialCost = baseCost;
     privateCostLabel = "MPC = MSC";
     socialCostLabel = "MPC = MSC";
 
     if (isInfo) {
-      privateBenefit = isOver ? highBenefit : lowBenefit;
-      socialBenefit = mpb;
+      privateBenefit = isOver ? higherBenefit : lowerBenefit;
+      socialBenefit = baseBenefit;
       privateBenefitLabel = "Perceived MPB";
       socialBenefitLabel = "Actual MPB";
     } else {
-      privateBenefit = mpb;
-      socialBenefit = msb;
+      privateBenefit = baseBenefit;
+      socialBenefit = higherBenefit;
       privateBenefitLabel = "MPB";
       socialBenefitLabel = "MSB";
     }
+  } else {
+    privateBenefit = baseBenefit;
+    socialBenefit = baseBenefit;
+    privateBenefitLabel = "MPB = MSB";
+    socialBenefitLabel = "MPB = MSB";
+
+    if (isInfo) {
+      privateCost = isOver ? lowerCost : higherCost;
+      socialCost = baseCost;
+      privateCostLabel = "Perceived MPC";
+      socialCostLabel = "Actual MPC";
+    } else {
+      privateCost = baseCost;
+      socialCost = higherCost;
+      privateCostLabel = "MPC";
+      socialCostLabel = "MSC";
+    }
   }
 
-  const qP = intersectX(privateCost, privateBenefit);
-  const qS = intersectX(socialCost, socialBenefit);
-  const qP_Y = privateCost.y(qP);
-  const qS_Y = socialCost.y(qS);
+  const qP = intersectionX(privateCost, privateBenefit);
+  const qS = intersectionX(socialCost, socialBenefit);
+  const qPY = privateCost.y(qP);
+  const qSY = socialCost.y(qS);
 
   const dwlPoints = isOver
     ? `${qS},${socialCost.y(qS)} ${qP},${socialCost.y(qP)} ${qP},${socialBenefit.y(qP)}`
@@ -97,46 +102,47 @@ function MarketFailureDiagram({ type }) {
 
       <svg viewBox="0 0 520 370" className="h-auto w-full">
         <defs>
-          <marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto">
+          <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto">
             <path d="M0,0 L0,6 L6,3 z" fill="#334155" />
           </marker>
         </defs>
 
-        <line x1="70" y1={axisY} x2="470" y2={axisY} stroke="#334155" strokeWidth="2" markerEnd="url(#arrow)" />
-        <line x1="70" y1={axisY} x2="70" y2="45" stroke="#334155" strokeWidth="2" markerEnd="url(#arrow)" />
-        <text x="474" y="315" className="fill-slate-700 text-xs font-semibold">Quantity</text>
+        <line x1="70" y1={axisY} x2="470" y2={axisY} stroke="#334155" strokeWidth="2" markerEnd="url(#arrowHead)" />
+        <line x1="70" y1={axisY} x2="70" y2="45" stroke="#334155" strokeWidth="2" markerEnd="url(#arrowHead)" />
+        <text x="470" y="330" className="fill-slate-700 text-xs font-semibold">Quantity</text>
         <text x="28" y="42" className="fill-slate-700 text-xs font-semibold">Cost / Benefit</text>
 
-        <line x1={x1} y1={privateCost.y(x1)} x2={x2} y2={privateCost.y(x2)} stroke="#2563eb" strokeWidth="3" />
+        <polygon points={dwlPoints} fill="#ef4444" opacity="0.35" stroke="#dc2626" strokeWidth="2" />
+
+        <line x1={xLeft} y1={privateCost.y(xLeft)} x2={xRight} y2={privateCost.y(xRight)} stroke="#2563eb" strokeWidth="3" />
         {socialCost !== privateCost && (
-          <line x1={x1} y1={socialCost.y(x1)} x2={x2} y2={socialCost.y(x2)} stroke="#dc2626" strokeWidth="3" />
+          <line x1={xLeft} y1={socialCost.y(xLeft)} x2={xRight} y2={socialCost.y(xRight)} stroke="#dc2626" strokeWidth="3" />
         )}
-        <line x1={x1} y1={privateBenefit.y(x1)} x2={x2} y2={privateBenefit.y(x2)} stroke="#16a34a" strokeWidth="3" />
+        <line x1={xLeft} y1={privateBenefit.y(xLeft)} x2={xRight} y2={privateBenefit.y(xRight)} stroke="#16a34a" strokeWidth="3" />
         {socialBenefit !== privateBenefit && (
-          <line x1={x1} y1={socialBenefit.y(x1)} x2={x2} y2={socialBenefit.y(x2)} stroke="#059669" strokeWidth="3" strokeDasharray="8,5" />
+          <line x1={xLeft} y1={socialBenefit.y(xLeft)} x2={xRight} y2={socialBenefit.y(xRight)} stroke="#059669" strokeWidth="3" strokeDasharray="8,5" />
         )}
 
-        <polygon points={dwlPoints} fill="#ef4444" opacity="0.35" stroke="#dc2626" strokeWidth="2.5" />
-        <text x={(qP + qS) / 2 - 10} y={(socialCost.y((qP + qS) / 2) + socialBenefit.y((qP + qS) / 2)) / 2} className="fill-red-700 text-sm font-black">DWL</text>
+        <line x1={qP} y1={axisY} x2={qP} y2={qPY} stroke="#64748b" strokeDasharray="5,5" />
+        <line x1={qS} y1={axisY} x2={qS} y2={qSY} stroke="#64748b" strokeDasharray="5,5" />
 
-        <line x1={qP} y1={axisY} x2={qP} y2={qP_Y} stroke="#64748b" strokeDasharray="5,5" opacity="0.8" />
-        <line x1={qS} y1={axisY} x2={qS} y2={qS_Y} stroke="#64748b" strokeDasharray="5,5" opacity="0.8" />
-        <circle cx={qP} cy={qP_Y} r="5" fill="#111827" />
-        <circle cx={qS} cy={qS_Y} r="5" fill="#111827" />
+        <circle cx={qP} cy={qPY} r="5" fill="#111827" />
+        <circle cx={qS} cy={qSY} r="5" fill="#111827" />
 
-        <text x={qP + 8} y={qP_Y - 8} className="fill-slate-900 text-xs font-black">QP: MPB = MPC</text>
-        <text x={qS + 8} y={qS_Y - 8} className="fill-slate-900 text-xs font-black">QS: MSB = MSC</text>
+        <text x={qP - 12} y="333" className="fill-slate-800 text-sm font-bold">QP</text>
+        <text x={qS - 12} y="333" className="fill-slate-800 text-sm font-bold">QS</text>
 
-        <text x={qP - 15} y="333" className="fill-slate-800 text-sm font-bold">QP</text>
-        <text x={qS - 15} y="333" className="fill-slate-800 text-sm font-bold">QS</text>
+        <text x={qP + 8} y={qPY - 8} className="fill-slate-900 text-xs font-black">QP</text>
+        <text x={qS + 8} y={qSY - 8} className="fill-slate-900 text-xs font-black">QS</text>
+        <text x={(qP + qS) / 2} y={(socialCost.y((qP + qS) / 2) + socialBenefit.y((qP + qS) / 2)) / 2} className="fill-red-700 text-sm font-black">DWL</text>
 
-        <text x="382" y={privateCost.y(390) - 8} className="fill-blue-700 text-sm font-bold">{privateCostLabel}</text>
+        <text x="372" y={privateCost.y(390) - 8} className="fill-blue-700 text-sm font-bold">{privateCostLabel}</text>
         {socialCost !== privateCost && (
-          <text x="382" y={socialCost.y(390) - 8} className="fill-red-700 text-sm font-bold">{socialCostLabel}</text>
+          <text x="372" y={socialCost.y(390) - 8} className="fill-red-700 text-sm font-bold">{socialCostLabel}</text>
         )}
-        <text x="372" y={privateBenefit.y(390) + 20} className="fill-green-700 text-sm font-bold">{privateBenefitLabel}</text>
+        <text x="360" y={privateBenefit.y(390) + 20} className="fill-green-700 text-sm font-bold">{privateBenefitLabel}</text>
         {socialBenefit !== privateBenefit && (
-          <text x="372" y={socialBenefit.y(390) + 20} className="fill-emerald-700 text-sm font-bold">{socialBenefitLabel}</text>
+          <text x="360" y={socialBenefit.y(390) + 20} className="fill-emerald-700 text-sm font-bold">{socialBenefitLabel}</text>
         )}
       </svg>
 
